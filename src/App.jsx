@@ -1,225 +1,199 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { ContactShadows } from '@react-three/drei'
+import { useMemo, useRef, useState } from 'react'
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
-
-const defaultObjects = [
+const defaultToolConfig = [
   {
-    id: 'silver-a',
-    label: 'A',
-    colorA: '#f0f3f7',
-    colorB: '#8a939d',
-    glow: 'rgba(180, 193, 207, 0.75)',
-    radius: 86,
-    orbitRadius: 150,
-    angularVelocity: 0.013,
-    baseAngle: 0.6,
-    vx: 1.5,
-    vy: 1.1,
+    id: 'wrench',
+    label: 'Wrench',
+    color: '#c88d4d',
+    speed: 1.15,
+    drift: [0.34, 0.2, 0.16],
+    rotationBias: -0.9,
   },
   {
-    id: 'silver-b',
-    label: 'B',
-    colorA: '#e7edf3',
-    colorB: '#636d79',
-    glow: 'rgba(207, 219, 233, 0.8)',
-    radius: 96,
-    orbitRadius: 240,
-    angularVelocity: 0.011,
-    baseAngle: 2.5,
-    vx: 1.9,
-    vy: 1.4,
+    id: 'hammer',
+    label: 'Hammer',
+    color: '#7fa37a',
+    speed: 1.4,
+    drift: [0.28, 0.24, 0.14],
+    rotationBias: 0.25,
   },
   {
-    id: 'silver-c',
-    label: 'C',
-    colorA: '#f8fafc',
-    colorB: '#7d8691',
-    glow: 'rgba(200, 210, 221, 0.8)',
-    radius: 74,
-    orbitRadius: 290,
-    angularVelocity: 0.0095,
-    baseAngle: 4.2,
-    vx: 1.25,
-    vy: 1.8,
+    id: 'screwdriver',
+    label: 'Screwdriver',
+    color: '#d7af89',
+    speed: 1.8,
+    drift: [0.22, 0.18, 0.12],
+    rotationBias: 0.8,
   },
 ]
 
-function MetalSphereButton({ sphere, active, onSelect, viewport }) {
-  const size = sphere.radius * 2
+const defaultNavItems = [
+  { label: 'Wrench', href: '#wrench' },
+  { label: 'Hammer', href: '#hammer' },
+  { label: 'Screwdriver', href: '#screwdriver' },
+]
+
+const buildTools = (toolConfig, slotSpacing = 2.7) =>
+  toolConfig.map((tool, index) => ({
+    ...tool,
+    position: [index === 1 ? 0 : (index - 1) * slotSpacing, 0, 0],
+  }))
+
+function ToolMesh({ tool, active, onClick, groupRef }) {
+  const metal = useMemo(
+    () => ({
+      wrench: '#c78552',
+      hammer: '#99ae8d',
+      screwdriver: '#d6b18c',
+    }[tool.id]),
+    [tool.id],
+  )
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return
+
+    const t = clock.getElapsedTime() * tool.speed
+    const [dx, dy, dz] = tool.drift
+    const x = tool.position[0] + Math.sin(t + tool.position[0]) * dx
+    const y = tool.position[1] + Math.cos(t * 1.35 + tool.position[1]) * dy
+    const z = tool.position[2] + Math.sin(t * 1.7 + tool.position[2]) * dz
+
+    groupRef.current.position.set(x, y, z)
+    groupRef.current.rotation.x = 0.45 + Math.sin(t * 1.2 + tool.position[0]) * 0.12
+    groupRef.current.rotation.y = 0.15 + Math.cos(t * 1.25 + tool.position[1]) * 0.14
+    groupRef.current.rotation.z =
+      tool.rotationBias + Math.sin(t * 1.5 + tool.position[2]) * 0.18
+    groupRef.current.scale.setScalar(active ? 1.12 : 1)
+  })
+
   return (
-    <button
-      type="button"
-      className={`metal-sphere ${active ? 'is-active' : ''}`}
-      style={{
-        width: `${size}px`,
-        height: `${size}px`,
-        left: `${clamp(sphere.x, 0, viewport.width - size)}px`,
-        top: `${clamp(sphere.y, 0, viewport.height - size)}px`,
-        '--sphere-color-a': sphere.colorA,
-        '--sphere-color-b': sphere.colorB,
-        '--sphere-glow': sphere.glow,
-      }}
-      onClick={() => onSelect(sphere.id)}
-      aria-label={`Select ${sphere.label}`}
-      aria-pressed={active}
+    <group
+      ref={groupRef}
+      onClick={onClick}
+      onPointerOver={() => (document.body.style.cursor = 'pointer')}
+      onPointerOut={() => (document.body.style.cursor = 'default')}
     >
-      <span className="metal-label">{sphere.label}</span>
-    </button>
+      {tool.id === 'wrench' && (
+        <>
+          <mesh castShadow receiveShadow position={[0, 0, 0]} rotation={[0, 0, 0.7]}>
+            <boxGeometry args={[1.1, 0.22, 0.18]} />
+            <meshStandardMaterial color={metal} metalness={0.94} roughness={0.18} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[-0.92, 0.18, 0]} rotation={[0, 0, 0.7]}>
+            <boxGeometry args={[0.44, 0.5, 0.16]} />
+            <meshStandardMaterial color={metal} metalness={0.94} roughness={0.18} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[0.95, -0.18, 0]} rotation={[0, 0, -0.7]}>
+            <boxGeometry args={[0.44, 0.5, 0.16]} />
+            <meshStandardMaterial color={metal} metalness={0.94} roughness={0.18} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[1.2, 0.52, 0]} rotation={[0, 0, -0.5]}>
+            <boxGeometry args={[0.32, 0.18, 0.18]} />
+            <meshStandardMaterial color={metal} metalness={0.94} roughness={0.18} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[-1.16, -0.54, 0]} rotation={[0, 0, 0.5]}>
+            <boxGeometry args={[0.32, 0.18, 0.18]} />
+            <meshStandardMaterial color={metal} metalness={0.94} roughness={0.18} />
+          </mesh>
+        </>
+      )}
+
+      {tool.id === 'hammer' && (
+        <>
+          <mesh castShadow receiveShadow position={[0, 0, 0]} rotation={[0, 0, 0.12]}>
+            <cylinderGeometry args={[0.13, 0.13, 2.05, 16]} />
+            <meshStandardMaterial color={'#d6c3a5'} metalness={0.45} roughness={0.4} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[0.96, 0.2, 0]}>
+            <boxGeometry args={[0.8, 0.68, 0.7]} />
+            <meshStandardMaterial color={metal} metalness={0.96} roughness={0.22} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[1.38, 0.2, 0]}>
+            <boxGeometry args={[0.42, 0.86, 0.86]} />
+            <meshStandardMaterial color={metal} metalness={0.96} roughness={0.2} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[0.95, 0.2, 0]} rotation={[0, 0, 0.06]}>
+            <boxGeometry args={[0.38, 0.25, 0.9]} />
+            <meshStandardMaterial color={'#b9d4bd'} metalness={0.8} roughness={0.2} />
+          </mesh>
+        </>
+      )}
+
+      {tool.id === 'screwdriver' && (
+        <>
+          <mesh castShadow receiveShadow position={[0, 0, 0]} rotation={[0, 0, 0.1]}>
+            <cylinderGeometry args={[0.18, 0.18, 2.2, 18]} />
+            <meshStandardMaterial color={'#d5b392'} metalness={0.78} roughness={0.26} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[1.45, 0, 0]} rotation={[0, 0, 0.12]}>
+            <cylinderGeometry args={[0.3, 0.3, 0.9, 20]} />
+            <meshStandardMaterial color={'#c4a582'} metalness={0.76} roughness={0.24} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[2.06, 0, 0]} rotation={[0, 0, 0.08]}>
+            <coneGeometry args={[0.18, 0.5, 20]} />
+            <meshStandardMaterial color={'#d9c9b3'} metalness={0.86} roughness={0.16} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[-1.05, 0, 0]}>
+            <boxGeometry args={[0.3, 0.8, 0.3]} />
+            <meshStandardMaterial color={'#9a7b65'} metalness={0.7} roughness={0.34} />
+          </mesh>
+        </>
+      )}
+    </group>
   )
 }
 
-export function PlasmicSphereCluster({
-  spheres = defaultObjects,
-  initialActiveId = defaultObjects[0]?.id ?? '',
-  className = '',
-  onSelect,
+function ToolGroup({ tool, active, onClick }) {
+  const groupRef = useRef(null)
+
+  return <ToolMesh tool={tool} active={active} onClick={onClick} groupRef={groupRef} />
+}
+
+export function ToolShowcase({
+  navItems = defaultNavItems,
+  toolConfig = defaultToolConfig,
+  slotSpacing = 2.7,
+  initialActiveId = defaultToolConfig[0].id,
+  backgroundColor = '#050505',
 }) {
-  const [viewport, setViewport] = useState({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
-    height: typeof window !== 'undefined' ? window.innerHeight : 800,
-  })
   const [activeId, setActiveId] = useState(initialActiveId)
-  const [motionSpheres, setMotionSpheres] = useState(() =>
-    spheres.map((sphere, index) => ({
-      ...sphere,
-      x: viewport.width / 2 + Math.cos(sphere.baseAngle + index) * sphere.orbitRadius,
-      y: viewport.height / 2 + Math.sin(sphere.baseAngle + index) * sphere.orbitRadius,
-    })),
-  )
-  const frameRef = useRef(0)
-
-  useEffect(() => {
-    const handleResize = () => {
-      setViewport({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
-    }
-
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  useEffect(() => {
-    const tick = () => {
-      setMotionSpheres((current) => {
-        const next = current.map((sphere) => {
-          const centerX = viewport.width / 2
-          const centerY = viewport.height / 2
-          const dx = centerX - sphere.x
-          const dy = centerY - sphere.y
-          const distance = Math.hypot(dx, dy) || 1
-          const tangentX = -dy / distance
-          const tangentY = dx / distance
-          const orbitPull = 0.18 + sphere.angularVelocity * 18
-
-          let nextX = sphere.x + sphere.vx + tangentX * sphere.angularVelocity * 120 + (dx / distance) * orbitPull
-          let nextY = sphere.y + sphere.vy + tangentY * sphere.angularVelocity * 120 + (dy / distance) * orbitPull
-          let nextVx = sphere.vx * 0.995
-          let nextVy = sphere.vy * 0.995
-
-          const maxX = viewport.width - sphere.radius * 2
-          const maxY = viewport.height - sphere.radius * 2
-
-          if (nextX <= 0 || nextX >= maxX) {
-            nextVx *= -1
-            nextX = clamp(nextX, 0, maxX)
-          }
-
-          if (nextY <= 0 || nextY >= maxY) {
-            nextVy *= -1
-            nextY = clamp(nextY, 0, maxY)
-          }
-
-          const angle = Math.atan2(nextY - centerY, nextX - centerX) + sphere.angularVelocity
-          const orbitX = centerX + Math.cos(angle) * sphere.orbitRadius
-          const orbitY = centerY + Math.sin(angle) * sphere.orbitRadius
-
-          const jitterX = Math.sin(angle * 2.4 + sphere.baseAngle) * 10
-          const jitterY = Math.cos(angle * 1.8 + sphere.baseAngle) * 10
-
-          return {
-            ...sphere,
-            x: clamp(orbitX + jitterX, 0, maxX),
-            y: clamp(orbitY + jitterY, 0, maxY),
-            vx: nextVx,
-            vy: nextVy,
-          }
-        })
-
-        const minimumGap = 24
-
-        for (let i = 0; i < next.length; i += 1) {
-          for (let j = i + 1; j < next.length; j += 1) {
-            const a = next[i]
-            const b = next[j]
-            const dx = b.x - a.x
-            const dy = b.y - a.y
-            const requiredDistance = a.radius + b.radius + minimumGap
-            const distanceSq = dx * dx + dy * dy
-
-            if (distanceSq < requiredDistance * requiredDistance) {
-              const distance = Math.sqrt(distanceSq) || 0.0001
-              const nx = dx / distance
-              const ny = dy / distance
-              const overlap = (requiredDistance - distance) / 2
-
-              a.x -= nx * overlap
-              a.y -= ny * overlap
-              b.x += nx * overlap
-              b.y += ny * overlap
-
-              const rvx = b.vx - a.vx
-              const rvy = b.vy - a.vy
-              const separatingVelocity = rvx * nx + rvy * ny
-
-              if (separatingVelocity < 0) {
-                const impulse = -separatingVelocity * 0.7
-                a.vx -= impulse * nx
-                a.vy -= impulse * ny
-                b.vx += impulse * nx
-                b.vy += impulse * ny
-              }
-            }
-          }
-        }
-
-        return next
-      })
-
-      frameRef.current = window.requestAnimationFrame(tick)
-    }
-
-    frameRef.current = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frameRef.current)
-  }, [viewport.height, viewport.width])
-
-  const handleSelection = (sphereId) => {
-    setActiveId(sphereId)
-    onSelect?.(sphereId)
-  }
+  const tools = useMemo(() => buildTools(toolConfig, slotSpacing), [toolConfig, slotSpacing])
 
   return (
-    <div className={`scene-shell ${className}`.trim()} aria-label="Rotating metallic sphere buttons">
-      {motionSpheres.map((sphere) => (
-        <MetalSphereButton
-          key={sphere.id}
-          sphere={sphere}
-          active={activeId === sphere.id}
-          viewport={viewport}
-          onSelect={handleSelection}
-        />
-      ))}
-    </div>
+    <main className="app-shell" aria-label="Three centered 3D tool buttons">
+      <nav className="top-nav" aria-label="Main navigation">
+        {navItems.map((item) => (
+          <a key={item.label} href={item.href} className="nav-link">
+            {item.label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="tool-stage">
+        <Canvas camera={{ position: [0, 0, 8], fov: 35 }} shadows>
+          <color attach="background" args={[backgroundColor]} />
+          <ambientLight intensity={1.4} />
+          <directionalLight position={[3, 4, 5]} intensity={2.6} color="#ffffff" castShadow />
+          <spotLight position={[-4, 5, 4]} intensity={1.8} angle={0.5} penumbra={1} castShadow />
+
+          {tools.map((tool) => (
+            <ToolGroup
+              key={tool.id}
+              tool={tool}
+              active={activeId === tool.id}
+              onClick={() => setActiveId(tool.id)}
+            />
+          ))}
+
+          <ContactShadows position={[0, -3.2, 0]} opacity={0.5} scale={12} blur={2.4} far={8} />
+        </Canvas>
+      </div>
+    </main>
   )
 }
 
 export default function App() {
-  return (
-    <main className="app-shell">
-      <div className="ambient-glow" aria-hidden="true" />
-      <PlasmicSphereCluster />
-    </main>
-  )
+  return <ToolShowcase />
 }
