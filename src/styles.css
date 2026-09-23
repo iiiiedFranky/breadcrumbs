@@ -72,6 +72,10 @@ button {
   opacity: 0.82;
 }
 
+.nav-link[href="#hardware"] {
+  font-size: 5px;
+}
+
 .nav-link:hover,
 .nav-link:focus-visible,
 .nav-link.hovered {
