@@ -65,11 +65,15 @@ button {
   color: rgba(255, 255, 255, 0.82);
   text-align: center;
   text-decoration: none;
-  font-size: 0.72rem;
+  font-size: 20px;
   letter-spacing: 0.14rem;
   text-transform: uppercase;
   transition: color 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
   opacity: 0.82;
+}
+
+.nav-link[href="#hardware"] {
+  font-size: 5px;
 }
 
 .nav-link:hover,
